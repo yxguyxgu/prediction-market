@@ -62,7 +62,7 @@ interface PriceReferenceHistoryResponse {
   rows?: PriceReferenceHistoryRow[]
 }
 
-const PRICE_REFERENCE_BASE_URL = 'https://price-reference.kuest.com'
+const PRICE_REFERENCE_BASE_URL = process.env.PRICE_REFERENCE_URL!
 const SERIES_MAP_TTL_MS = 5 * 60 * 1000
 
 let seriesMapBySlugCache = new Map<string, SeriesMapItem>()
