@@ -1,6 +1,6 @@
 'use client'
 
-import type { PlatformNavigationTag } from '@/lib/platform-navigation'
+import type { PlatformCategorySidebarLinkItem, PlatformNavigationTag } from '@/lib/platform-navigation'
 import { useExtracted } from 'next-intl'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -9,9 +9,9 @@ import { cn } from '@/lib/utils'
 interface HomeSecondaryNavigationProps {
   activeSubtagSlug: string
   hideOnDesktop?: boolean
-  onSelectTag: (targetTag: string) => void
+  onSelectTag: (target: Pick<PlatformCategorySidebarLinkItem, 'href' | 'slug'>) => void
   showCategoryTitle?: boolean
-  tag: Pick<PlatformNavigationTag, 'childs' | 'name' | 'slug'>
+  tag: Pick<PlatformNavigationTag, 'childs' | 'name' | 'sidebarItems' | 'slug'>
 }
 
 export default function HomeSecondaryNavigation({
@@ -31,11 +31,21 @@ export default function HomeSecondaryNavigation({
   const indicatorRetryRef = useRef<number | null>(null)
 
   const tagItems = useMemo(() => {
+    if (tag.sidebarItems) {
+      return tag.sidebarItems
+        .filter(item => item.type === 'link')
+        .map(item => ({
+          href: item.href,
+          slug: item.slug,
+          label: item.isAll ? t('All') : item.label,
+        }))
+    }
+
     return [
-      { slug: tag.slug, label: t('All') },
-      ...tag.childs.map(child => ({ slug: child.slug, label: child.name })),
+      { href: undefined, slug: tag.slug, label: t('All') },
+      ...tag.childs.map(child => ({ href: undefined, slug: child.slug, label: child.name })),
     ]
-  }, [tag.childs, tag.slug, t])
+  }, [tag.childs, tag.sidebarItems, tag.slug, t])
 
   const resolvedActiveSubtagSlug = useMemo(
     () => (tagItems.some(item => item.slug === activeSubtagSlug) ? activeSubtagSlug : tag.slug),
@@ -201,7 +211,7 @@ export default function HomeSecondaryNavigation({
               ref={(element: HTMLButtonElement | null) => {
                 buttonRef.current[index] = element
               }}
-              onClick={() => onSelectTag(item.slug)}
+              onClick={() => onSelectTag({ slug: item.slug, href: item.href })}
               variant="ghost"
               size="sm"
               className={cn(

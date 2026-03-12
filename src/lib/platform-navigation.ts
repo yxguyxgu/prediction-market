@@ -1,12 +1,63 @@
 export interface PlatformNavigationChild {
   name: string
   slug: string
+  count?: number
 }
+
+export type PlatformCategorySidebarIconKey
+  = | 'all-grid'
+    | 'five-minute'
+    | 'fifteen-minute'
+    | 'hourly'
+    | 'four-hour'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'yearly'
+    | 'pre-market'
+    | 'etf'
+    | 'bitcoin'
+    | 'ethereum'
+    | 'solana'
+    | 'xrp'
+    | 'dogecoin'
+    | 'microstrategy'
+    | 'stocks'
+    | 'earnings'
+    | 'indicies'
+    | 'commodities'
+    | 'forex'
+    | 'collectibles'
+    | 'acquisitions'
+    | 'earnings-calendar'
+    | 'earnings-calls'
+    | 'ipo'
+    | 'fed-rates'
+    | 'prediction-markets'
+    | 'treasuries'
+
+export interface PlatformCategorySidebarLinkItem {
+  type: 'link'
+  slug: string
+  label: string
+  count?: number
+  href?: string
+  icon?: PlatformCategorySidebarIconKey
+  isAll?: boolean
+}
+
+export type PlatformCategorySidebarItem
+  = | PlatformCategorySidebarLinkItem
+    | {
+      type: 'divider'
+      key: string
+    }
 
 export interface PlatformNavigationTag {
   slug: string
   name: string
   childs: PlatformNavigationChild[]
+  sidebarItems?: PlatformCategorySidebarItem[]
 }
 
 export interface PlatformNavigationFilters {
