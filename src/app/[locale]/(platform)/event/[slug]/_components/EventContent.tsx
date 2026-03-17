@@ -6,7 +6,6 @@ import { useExtracted } from 'next-intl'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import EventDeferredSection from '@/app/[locale]/(platform)/event/[slug]/_components/EventDeferredSection'
 import EventHeader from '@/app/[locale]/(platform)/event/[slug]/_components/EventHeader'
 import EventMarketChannelProvider from '@/app/[locale]/(platform)/event/[slug]/_components/EventMarketChannelProvider'
 import EventMarkets from '@/app/[locale]/(platform)/event/[slug]/_components/EventMarkets'
@@ -20,6 +19,7 @@ import EventTabs from '@/app/[locale]/(platform)/event/[slug]/_components/EventT
 import ResolutionTimelinePanel from '@/app/[locale]/(platform)/event/[slug]/_components/ResolutionTimelinePanel'
 import { resolveEventOrderBootstrapSelection } from '@/app/[locale]/(platform)/event/[slug]/_utils/event-order-bootstrap-selection'
 import { shouldDisplayResolutionTimeline } from '@/app/[locale]/(platform)/event/[slug]/_utils/resolution-timeline-builder'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ORDER_SIDE, ORDER_TYPE } from '@/lib/constants'
 import { formatAmountInputValue } from '@/lib/formatters'
@@ -31,32 +31,32 @@ import EventLiveSeriesChart, { shouldUseLiveSeriesChart } from './EventLiveSerie
 
 const EventMarketContext = dynamic(
   () => import('@/app/[locale]/(platform)/event/[slug]/_components/EventMarketContext'),
-  { ssr: false, loading: () => null },
+  { ssr: false, loading: () => <Skeleton className="h-18" /> },
 )
 
 const EventOrderPanelMobile = dynamic(
   () => import('@/app/[locale]/(platform)/event/[slug]/_components/EventOrderPanelMobile'),
-  { loading: () => null },
+  { ssr: false, loading: () => null },
 )
 
 const EventRelated = dynamic(
   () => import('@/app/[locale]/(platform)/event/[slug]/_components/EventRelated'),
-  { loading: () => <EventRelatedSkeleton /> },
+  { ssr: false, loading: () => <EventRelatedSkeleton /> },
 )
 
 const EventMarketPositions = dynamic(
   () => import('@/app/[locale]/(platform)/event/[slug]/_components/EventMarketPositions'),
-  { loading: () => <EventSectionSkeleton className="min-h-52" /> },
+  { ssr: false, loading: () => <Skeleton className="h-52" /> },
 )
 
 const EventMarketOpenOrders = dynamic(
   () => import('@/app/[locale]/(platform)/event/[slug]/_components/EventMarketOpenOrders'),
-  { loading: () => <EventSectionSkeleton className="min-h-52" /> },
+  { ssr: false, loading: () => <Skeleton className="h-52" /> },
 )
 
 const EventMarketHistory = dynamic(
   () => import('@/app/[locale]/(platform)/event/[slug]/_components/EventMarketHistory'),
-  { loading: () => <EventSectionSkeleton className="min-h-52" /> },
+  { ssr: false, loading: () => <Skeleton className="h-52" /> },
 )
 
 interface EventContentProps {
@@ -77,10 +77,6 @@ function resolveDefaultMarket(markets: Event['markets']) {
   return markets.find(market => market.is_active && !isMarketResolved(market))
     ?? markets.find(market => !isMarketResolved(market))
     ?? markets[0]
-}
-
-function EventSectionSkeleton({ className = 'min-h-32' }: { className?: string }) {
-  return <div className={cn('rounded-xl border bg-muted/20', className)} aria-hidden="true" />
 }
 
 interface EventOrderQuerySyncProps {
@@ -229,6 +225,7 @@ export default function EventContent({
     }
     return initialMarket.outcomes[0] ?? null
   }, [initialMarket])
+  const [hasResolvedMobileBreakpoint, setHasResolvedMobileBreakpoint] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [backToTopBounds, setBackToTopBounds] = useState<{ left: number, width: number } | null>(null)
   const selectedMarket = useMemo(() => {
@@ -240,6 +237,22 @@ export default function EventContent({
   const singleMarket = event.markets[0]
   const isSingleMarketResolved = isMarketResolved(singleMarket)
   const usesLiveSeriesChart = Boolean(liveChartConfig && shouldUseLiveSeriesChart(event, liveChartConfig))
+  const shouldRenderMobileRelated = hasResolvedMobileBreakpoint && isMobile
+  const shouldRenderDesktopRelated = hasResolvedMobileBreakpoint && !isMobile
+
+  useEffect(() => {
+    let isActive = true
+
+    queueMicrotask(() => {
+      if (isActive) {
+        setHasResolvedMobileBreakpoint(true)
+      }
+    })
+
+    return () => {
+      isActive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (user?.id) {
@@ -379,45 +392,33 @@ export default function EventContent({
                 {event.total_markets_count > 1 && <EventMarkets event={event} isMobile={isMobile} />}
               </div>
               {event.total_markets_count === 1 && singleMarket && (
-                <EventDeferredSection
-                  fallback={<EventSectionSkeleton className="min-h-52" />}
-                  minHeightClassName="grid gap-6"
-                >
-                  <>
-                    {currentUser && (
-                      <EventMarketPositions
-                        market={singleMarket}
-                        isNegRiskEnabled={isNegRiskEnabled}
-                        isNegRiskAugmented={Boolean(event.neg_risk_augmented)}
-                        eventOutcomes={event.markets.map(market => ({
-                          conditionId: market.condition_id,
-                          questionId: market.question_id,
-                          label: market.short_title || market.title,
-                          iconUrl: market.icon_url,
-                        }))}
-                        negRiskMarketId={event.neg_risk_market_id}
-                      />
-                    )}
-                    {!isSingleMarketResolved && (
-                      <EventSingleMarketOrderBook
-                        market={singleMarket}
-                        eventSlug={event.slug}
-                        showCompactVolume={usesLiveSeriesChart}
-                      />
-                    )}
-                    {currentUser && <EventMarketOpenOrders market={singleMarket} eventSlug={event.slug} />}
-                    {currentUser && <EventMarketHistory market={singleMarket} />}
-                  </>
-                </EventDeferredSection>
+                <div className="grid gap-6">
+                  {currentUser && (
+                    <EventMarketPositions
+                      market={singleMarket}
+                      isNegRiskEnabled={isNegRiskEnabled}
+                      isNegRiskAugmented={Boolean(event.neg_risk_augmented)}
+                      eventOutcomes={event.markets.map(market => ({
+                        conditionId: market.condition_id,
+                        questionId: market.question_id,
+                        label: market.short_title || market.title,
+                        iconUrl: market.icon_url,
+                      }))}
+                      negRiskMarketId={event.neg_risk_market_id}
+                    />
+                  )}
+                  {!isSingleMarketResolved && (
+                    <EventSingleMarketOrderBook
+                      market={singleMarket}
+                      eventSlug={event.slug}
+                      showCompactVolume={usesLiveSeriesChart}
+                    />
+                  )}
+                  {currentUser && <EventMarketOpenOrders market={singleMarket} eventSlug={event.slug} />}
+                  {currentUser && <EventMarketHistory market={singleMarket} />}
+                </div>
               )}
-              {marketContextEnabled && (
-                <EventDeferredSection
-                  fallback={<EventSectionSkeleton className="min-h-32" />}
-                  minHeightClassName="min-h-32"
-                >
-                  <EventMarketContext event={event} />
-                </EventDeferredSection>
-              )}
+              {marketContextEnabled && <EventMarketContext event={event} />}
               <EventRules event={event} />
               {event.total_markets_count === 1
                 && selectedMarket
@@ -428,16 +429,11 @@ export default function EventContent({
               )}
             </div>
 
-            {isMobile && (
-              <EventDeferredSection
-                fallback={<EventSectionSkeleton className="min-h-32" />}
-                minHeightClassName="lg:hidden"
-              >
-                <div className="grid gap-4">
-                  <h3 className="text-base font-medium">{t('Related')}</h3>
-                  <EventRelated event={event} />
-                </div>
-              </EventDeferredSection>
+            {shouldRenderMobileRelated && (
+              <div className="grid gap-4 lg:hidden">
+                <h3 className="text-base font-medium">{t('Related')}</h3>
+                <EventRelated event={event} />
+              </div>
             )}
             <EventTabs event={event} user={currentUser} />
           </div>
@@ -459,13 +455,7 @@ export default function EventContent({
               />
               <EventOrderPanelTermsDisclaimer />
               <span className="border border-dashed"></span>
-              <EventDeferredSection
-                fallback={<EventSectionSkeleton className="min-h-32" />}
-                minHeightClassName="min-h-32"
-                rootMargin="480px 0px"
-              >
-                <EventRelated event={event} />
-              </EventDeferredSection>
+              {shouldRenderDesktopRelated ? <EventRelated event={event} /> : <EventRelatedSkeleton />}
             </div>
           </aside>
         )}

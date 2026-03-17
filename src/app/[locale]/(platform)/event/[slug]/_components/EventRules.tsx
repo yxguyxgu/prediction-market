@@ -39,6 +39,8 @@ const UMA_RESOLVER_ADDRESS_SET = new Set(
 )
 const RULES_URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+)/g
 const RULES_URL_TRAILING_PUNCTUATION_REGEX = /([)\].,!?;:]+)$/
+const RULES_LABEL_WHITESPACE_REGEX = /\s+/gu
+const EVENT_RULES_TIMESTAMP_LOCALE = 'en-US'
 
 function getResolverGradient(address?: string) {
   if (!address) {
@@ -47,6 +49,10 @@ function getResolverGradient(address?: string) {
 
   const checksum = [...address.toLowerCase()].reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return RESOLVER_GRADIENTS[checksum % RESOLVER_GRADIENTS.length]
+}
+
+function normalizeRulesLabelWhitespace(value: string) {
+  return value.replace(RULES_LABEL_WHITESPACE_REGEX, ' ').trim()
 }
 
 export default function EventRules({ event, mode = 'accordion', showEndDate = false }: EventRulesProps) {
@@ -84,7 +90,7 @@ export default function EventRules({ event, mode = 'accordion', showEndDate = fa
       return t('—')
     }
 
-    return new Intl.DateTimeFormat(locale, {
+    const parts = new Intl.DateTimeFormat(EVENT_RULES_TIMESTAMP_LOCALE, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -92,7 +98,16 @@ export default function EventRules({ event, mode = 'accordion', showEndDate = fa
       minute: '2-digit',
       hour12: true,
       timeZone: 'America/New_York',
-    }).format(date)
+    }).formatToParts(date)
+
+    const month = parts.find(part => part.type === 'month')?.value ?? ''
+    const day = parts.find(part => part.type === 'day')?.value ?? ''
+    const year = parts.find(part => part.type === 'year')?.value ?? ''
+    const hour = parts.find(part => part.type === 'hour')?.value ?? ''
+    const minute = parts.find(part => part.type === 'minute')?.value ?? ''
+    const dayPeriod = parts.find(part => part.type === 'dayPeriod')?.value ?? ''
+
+    return normalizeRulesLabelWhitespace(`${month} ${day}, ${year}, ${hour}:${minute} ${dayPeriod}`)
   }
 
   function formatEndDate(value: string | null | undefined): string {

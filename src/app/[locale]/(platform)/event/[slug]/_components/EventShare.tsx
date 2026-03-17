@@ -24,16 +24,40 @@ interface EventShareProps {
   event: Event
 }
 
+interface AffiliateToastData {
+  affiliateSharePercent: number | null
+  tradeFeePercent: number | null
+}
+
+function parseAffiliateToastData(result: Awaited<ReturnType<typeof fetchAffiliateSettingsFromAPI>>): AffiliateToastData {
+  if (!result.success) {
+    return {
+      affiliateSharePercent: null,
+      tradeFeePercent: null,
+    }
+  }
+
+  const shareParsed = Number.parseFloat(result.data.affiliateSharePercent)
+  const feeParsed = Number.parseFloat(result.data.tradeFeePercent)
+
+  return {
+    affiliateSharePercent: Number.isFinite(shareParsed) && shareParsed > 0 ? shareParsed : null,
+    tradeFeePercent: Number.isFinite(feeParsed) && feeParsed > 0 ? feeParsed : null,
+  }
+}
+
 export default function EventShare({ event }: EventShareProps) {
   const site = useSiteIdentity()
   const [shareSuccess, setShareSuccess] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [affiliateSharePercent, setAffiliateSharePercent] = useState<number | null>(null)
   const [tradeFeePercent, setTradeFeePercent] = useState<number | null>(null)
+  const [hasResolvedAffiliateToastData, setHasResolvedAffiliateToastData] = useState(false)
   const [shareMenuOpen, setShareMenuOpen] = useState(false)
   const copyTimeoutRef = useRef<number | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const affiliateToastDataRequestRef = useRef<Promise<AffiliateToastData> | null>(null)
   const user = useUser()
   const affiliateCode = user?.affiliate_code?.trim() ?? ''
   const isMultiMarket = event.total_markets_count > 1
@@ -86,51 +110,75 @@ export default function EventShare({ event }: EventShareProps) {
   }, [])
 
   useEffect(() => {
+    setAffiliateSharePercent(null)
+    setTradeFeePercent(null)
+    setHasResolvedAffiliateToastData(false)
+    affiliateToastDataRequestRef.current = null
+  }, [affiliateCode])
+
+  const ensureAffiliateToastData = useCallback(async (): Promise<AffiliateToastData> => {
     if (!affiliateCode) {
-      setAffiliateSharePercent(null)
-      setTradeFeePercent(null)
+      return {
+        affiliateSharePercent: null,
+        tradeFeePercent: null,
+      }
+    }
+
+    if (hasResolvedAffiliateToastData) {
+      return {
+        affiliateSharePercent,
+        tradeFeePercent,
+      }
+    }
+
+    if (affiliateToastDataRequestRef.current) {
+      return affiliateToastDataRequestRef.current
+    }
+
+    const request = fetchAffiliateSettingsFromAPI()
+      .then((result) => {
+        const nextData = parseAffiliateToastData(result)
+        setAffiliateSharePercent(nextData.affiliateSharePercent)
+        setTradeFeePercent(nextData.tradeFeePercent)
+        setHasResolvedAffiliateToastData(result.success)
+        return nextData
+      })
+      .catch(() => {
+        const nextData = {
+          affiliateSharePercent: null,
+          tradeFeePercent: null,
+        }
+        setAffiliateSharePercent(nextData.affiliateSharePercent)
+        setTradeFeePercent(nextData.tradeFeePercent)
+        return nextData
+      })
+      .finally(() => {
+        affiliateToastDataRequestRef.current = null
+      })
+
+    affiliateToastDataRequestRef.current = request
+    return request
+  }, [affiliateCode, affiliateSharePercent, hasResolvedAffiliateToastData, tradeFeePercent])
+
+  useEffect(() => {
+    if (!affiliateCode || !shareMenuOpen) {
       return
     }
 
-    let isActive = true
+    void ensureAffiliateToastData()
+  }, [affiliateCode, ensureAffiliateToastData, shareMenuOpen])
 
-    fetchAffiliateSettingsFromAPI()
-      .then((result) => {
-        if (!isActive) {
-          return
-        }
-        if (result.success) {
-          const shareParsed = Number.parseFloat(result.data.affiliateSharePercent)
-          const feeParsed = Number.parseFloat(result.data.tradeFeePercent)
-          setAffiliateSharePercent(Number.isFinite(shareParsed) && shareParsed > 0 ? shareParsed : null)
-          setTradeFeePercent(Number.isFinite(feeParsed) && feeParsed > 0 ? feeParsed : null)
-        }
-        else {
-          setAffiliateSharePercent(null)
-          setTradeFeePercent(null)
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setAffiliateSharePercent(null)
-          setTradeFeePercent(null)
-        }
-      })
+  const showAffiliateToast = useCallback(async () => {
+    const toastData = await ensureAffiliateToastData()
 
-    return () => {
-      isActive = false
-    }
-  }, [affiliateCode])
-
-  const showAffiliateToast = useCallback(() => {
     maybeShowAffiliateToast({
       affiliateCode,
-      affiliateSharePercent,
-      tradeFeePercent,
+      affiliateSharePercent: toastData.affiliateSharePercent,
+      tradeFeePercent: toastData.tradeFeePercent,
       siteName: site.name,
       context: 'link',
     })
-  }, [affiliateCode, affiliateSharePercent, site.name, tradeFeePercent])
+  }, [affiliateCode, ensureAffiliateToastData, site.name])
 
   const debugPayload = useMemo(() => {
     return {
@@ -188,7 +236,7 @@ export default function EventShare({ event }: EventShareProps) {
       const url = buildShareUrl(eventPath)
       await navigator.clipboard.writeText(url)
       setShareSuccess(true)
-      showAffiliateToast()
+      await showAffiliateToast()
       setTimeout(() => setShareSuccess(false), 2000)
     }
     catch (error) {
@@ -205,7 +253,7 @@ export default function EventShare({ event }: EventShareProps) {
         window.clearTimeout(copyTimeoutRef.current)
       }
       copyTimeoutRef.current = window.setTimeout(() => setCopiedKey(null), 1600)
-      showAffiliateToast()
+      await showAffiliateToast()
     }
     catch (error) {
       console.error('Error copying URL:', error)
