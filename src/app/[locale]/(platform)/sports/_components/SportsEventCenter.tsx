@@ -2511,7 +2511,7 @@ export default function SportsEventCenter({
                         <span className="relative z-1 mr-1 uppercase opacity-80">{button.label}</span>
                         <span className={cn(
                           'relative z-1 text-sm leading-none tabular-nums transition-opacity',
-                          isActive ? 'text-foreground opacity-100' : 'opacity-45',
+                          isActive ? 'opacity-100' : 'opacity-45',
                         )}
                         >
                           {formatButtonOdds(button.cents)}
@@ -2801,8 +2801,8 @@ export default function SportsEventCenter({
                 onOpenRedeemForCondition={handleOpenRedeemForCondition}
                 oddsFormat={oddsFormat}
                 onChangeTab={() => {}}
-                onSelectButton={(buttonKey) => {
-                  setActiveTradeButtonKey(buttonKey)
+                onSelectButton={(buttonKey, options) => {
+                  updateSectionSelection('moneyline', buttonKey, options)
                 }}
               />
             </div>
@@ -2963,7 +2963,7 @@ export default function SportsEventCenter({
                                           <span className="relative z-1 mr-1 uppercase opacity-80">{button.label}</span>
                                           <span className={cn(
                                             'relative z-1 text-sm leading-none tabular-nums transition-opacity',
-                                            isActive ? 'text-foreground opacity-100' : 'opacity-45',
+                                            isActive ? 'opacity-100' : 'opacity-45',
                                           )}
                                           >
                                             {formatButtonOdds(button.cents)}
