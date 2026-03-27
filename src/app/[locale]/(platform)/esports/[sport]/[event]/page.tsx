@@ -21,13 +21,13 @@ export async function generateMetadata({
   return await generateSportsVerticalEventMetadata(await params)
 }
 
-export default async function SportsEventPage({
+export default async function EsportsEventPage({
   params,
 }: {
   params: RouteParams
 }) {
   return await renderSportsVerticalEventPage({
     ...(await params),
-    vertical: 'sports',
+    vertical: 'esports',
   })
 }
