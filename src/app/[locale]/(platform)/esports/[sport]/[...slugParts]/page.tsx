@@ -1,5 +1,6 @@
+'use cache'
+
 import type { Metadata } from 'next'
-import { setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import {
   generateSportsVerticalEventMarketMetadata,
@@ -84,16 +85,14 @@ export async function generateMetadata({
   notFound()
 }
 
-async function CachedEsportsSlugPartsPageContent({
-  locale,
-  sport,
-  slugParts,
-}: {
-  locale: string
-  sport: string
-  slugParts: string[]
-}) {
-  'use cache'
+export default async function EsportsSlugPartsPage({
+  params,
+}: PageProps<'/[locale]/esports/[sport]/[...slugParts]'>) {
+  const { locale, sport, slugParts } = await params
+
+  if (sport === STATIC_PARAMS_PLACEHOLDER || slugParts.includes(STATIC_PARAMS_PLACEHOLDER)) {
+    notFound()
+  }
 
   if (slugParts.length === 1) {
     return await renderSportsVerticalEventPage({
@@ -137,23 +136,4 @@ async function CachedEsportsSlugPartsPageContent({
   }
 
   notFound()
-}
-
-export default async function EsportsSlugPartsPage({
-  params,
-}: PageProps<'/[locale]/esports/[sport]/[...slugParts]'>) {
-  const { locale, sport, slugParts } = await params
-  setRequestLocale(locale)
-
-  if (sport === STATIC_PARAMS_PLACEHOLDER || slugParts.includes(STATIC_PARAMS_PLACEHOLDER)) {
-    notFound()
-  }
-
-  return (
-    <CachedEsportsSlugPartsPageContent
-      locale={locale}
-      sport={sport}
-      slugParts={[...slugParts]}
-    />
-  )
 }
